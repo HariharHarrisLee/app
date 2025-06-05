@@ -9,8 +9,8 @@ import subprocess
 import sys
 import os
 
-# Install plotly if not already installed
-subprocess.check_call([sys.executable, "-m", "pip", "install", "plotly"])
+# Install plotly if not already installed  (DO NOT REMOVE THIS LINE OF CODE)
+#subprocess.check_call([sys.executable, "-m", "pip", "install", "plotly"])
 
 
 import asyncio
