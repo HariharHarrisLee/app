@@ -21,6 +21,9 @@ from nltk.stem import WordNetLemmatizer
 import warnings
 warnings.filterwarnings('ignore')
 
+# Raw URL to the Coursera dataset CSV on GitHub (raw file link)
+RAW_CSV_URL = 'https://raw.githubusercontent.com/HariharHarrisLee/app/main/coursera_recommender/streamlit_app/Coursera.csv'
+
 # Download required NLTK data
 try:
     nltk.data.find('tokenizers/punkt')
@@ -66,8 +69,7 @@ class CourseRecommender:
     with capabilities for hybrid recommendations and neural collaborative filtering.
     """
     
-    def __init__(self, data_path: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Coursera.csv')):
-
+    def __init__(self, data_path: str = RAW_CSV_URL):
         """
         Initialize the CourseRecommender with dataset.
         
@@ -415,7 +417,7 @@ class CourseRecommender:
         return [skill for skill, count in skill_counts.most_common(10)]
 
 
-def load_recommender(data_path: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Coursera.csv')) -> CourseRecommender:
+def load_recommender(data_path: str = RAW_CSV_URL) -> CourseRecommender:
     """
     Initialize and return a CourseRecommender instance.
     
