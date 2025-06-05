@@ -12,6 +12,17 @@ import os
 # Install plotly if not already installed
 subprocess.check_call([sys.executable, "-m", "pip", "install", "plotly"])
 
+
+import asyncio
+
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
