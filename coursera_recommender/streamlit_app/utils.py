@@ -53,6 +53,11 @@ def safe_re_sub(pattern: str, repl: str, string: str) -> str:
     Returns:
         str: Result after applying regex substitution or original string if error.
     """
+    
+    if not pattern:
+        print("Warning: Empty regex pattern provided. Returning original string.")
+        return string
+    
     try:
         return re.sub(pattern, repl, string)
     except re.error as e:
