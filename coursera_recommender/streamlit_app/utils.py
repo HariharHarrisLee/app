@@ -394,7 +394,7 @@ class CourseRecommender:
         return [skill for skill, count in skill_counts.most_common(10)]
 
 
-def load_recommender(data_path: str = '../data/coursera_courses.csv') -> CourseRecommender:
+def load_recommender(data_path: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Coursera.csv')) -> CourseRecommender:
     """
     Initialize and return a CourseRecommender instance.
     
