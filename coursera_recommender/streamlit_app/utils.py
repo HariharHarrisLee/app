@@ -38,6 +38,26 @@ except LookupError:
     nltk.download('wordnet')
 
 
+def safe_re_sub(pattern: str, repl: str, string: str) -> str:
+    """
+    A safe wrapper around re.sub to catch regex errors.
+    
+    Args:
+        pattern (str): Regex pattern.
+        repl (str): Replacement string.
+        string (str): Input string to process.
+    
+    Returns:
+        str: Result after applying regex substitution or original string if error.
+    """
+    try:
+        return re.sub(pattern, repl, string)
+    except re.error as e:
+        print(f"Regex error with pattern '{pattern}': {e}")
+        # Fallback: remove non-alphabetic characters manually
+        return ''.join([c for c in string if c.isalpha() or c.isspace()])
+
+
 class CourseRecommender:
     """
     A comprehensive course recommendation system using multiple approaches.
@@ -192,9 +212,10 @@ class CourseRecommender:
         """
         # Convert to lowercase
         text = text.lower()
-        
-        # Remove special characters and digits
-        text = re.sub(r'[^a-zA-Z\s]', '', text)
+
+        # Remove special characters and digits safely
+        pattern = r'[^a-zA-Z\s]'
+        text = safe_re_sub(pattern, '', text)
         
         # Tokenize
         tokens = word_tokenize(text)
