@@ -46,7 +46,8 @@ class CourseRecommender:
     with capabilities for hybrid recommendations and neural collaborative filtering.
     """
     
-    def __init__(self, data_path: str = '../data/coursera_courses.csv'):
+    def __init__(self, data_path: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Coursera.csv')):
+
         """
         Initialize the CourseRecommender with dataset.
         

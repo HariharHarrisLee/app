@@ -91,7 +91,7 @@ def initialize_recommender():
     Returns:
         CourseRecommender: Initialized recommender instance.
     """
-    data_path = os.path.join(os.path.dirname(__file__), '../data/coursera_courses.csv')
+    data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Coursera.csv')
     return load_recommender(data_path)
 
 def display_course_card(course: Dict[str, Any], show_similarity: bool = True):
