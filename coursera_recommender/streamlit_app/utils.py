@@ -7,10 +7,8 @@ for the Coursera course recommender system using NLP and deep learning.
 
 import pandas as pd
 import numpy as np
-import pickle
-import os
-from typing import List, Dict, Tuple, Any
 import re
+from typing import List, Dict, Any
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
@@ -25,20 +23,11 @@ warnings.filterwarnings('ignore')
 RAW_CSV_URL = 'https://raw.githubusercontent.com/HariharHarrisLee/app/main/coursera_recommender/streamlit_app/Coursera.csv'
 
 # Download required NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
-
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
-
-try:
-    nltk.data.find('corpora/wordnet')
-except LookupError:
-    nltk.download('wordnet')
+for resource in ['punkt', 'stopwords', 'wordnet']:
+    try:
+        nltk.data.find(f'tokenizers/{resource}' if resource == 'punkt' else f'corpora/{resource}')
+    except LookupError:
+        nltk.download(resource)
 
 
 def safe_re_sub(pattern: str, repl: str, string: str) -> str:
@@ -53,7 +42,6 @@ def safe_re_sub(pattern: str, repl: str, string: str) -> str:
     Returns:
         str: Result after applying regex substitution or original string if error.
     """
-    
     if not pattern:
         print("Warning: Empty regex pattern provided. Returning original string.")
         return string
@@ -122,17 +110,16 @@ class CourseRecommender:
         Returns:
             pd.DataFrame: Cleaned dataframe.
         """
-        # Handle missing values
+        # Drop rows missing essential text fields
         self.df = self.df.dropna(subset=['Course Name', 'Course Description'])
         
         # Clean and standardize text fields
         text_columns = ['Course Name', 'Course Description', 'Skills']
         for col in text_columns:
             if col in self.df.columns:
-                self.df[col] = self.df[col].astype(str)
-                self.df[col] = self.df[col].str.strip()
+                self.df[col] = self.df[col].astype(str).str.strip()
         
-        # Clean difficulty levels
+        # Map difficulty levels to numeric
         if 'Difficulty Level' in self.df.columns:
             difficulty_mapping = {
                 'Beginner': 1,
@@ -141,10 +128,10 @@ class CourseRecommender:
             }
             self.df['Difficulty_Numeric'] = self.df['Difficulty Level'].map(difficulty_mapping)
         
-        # Clean ratings
+        # Convert ratings to numeric and fill missing with median
         if 'Course Rating' in self.df.columns:
             self.df['Course Rating'] = pd.to_numeric(self.df['Course Rating'], errors='coerce')
-            self.df['Course Rating'] = self.df['Course Rating'].fillna(self.df['Course Rating'].median())
+            self.df['Course Rating'].fillna(self.df['Course Rating'].median(), inplace=True)
         
         return self.df
     
@@ -168,11 +155,11 @@ class CourseRecommender:
                     skills = [skill.strip() for skill in str(skills_str).split(',')]
                     all_skills.update(skills)
             
-            # Create binary features for top skills
-            top_skills = sorted(list(all_skills))[:20]  # Limit to top 20 skills
+            # Create binary features for top skills (limit to top 20 sorted alphabetically)
+            top_skills = sorted(list(all_skills))[:20]
             for skill in top_skills:
                 self.df[f'skill_{skill.replace(" ", "_").lower()}'] = self.df['Skills'].str.contains(
-                    skill, case=False, na=False
+                    re.escape(skill), case=False, na=False
                 ).astype(int)
         
         return self.df
@@ -197,9 +184,9 @@ class CourseRecommender:
                 text_parts.append(str(row['Course Description']))
                 
             if pd.notna(row['Skills']):
-                # Add skills with higher weight
+                # Add skills with higher weight by repeating them
                 skills = str(row['Skills']).replace(',', ' ')
-                text_parts.extend([skills] * 2)  # Give skills more weight
+                text_parts.extend([skills] * 2)
             
             combined_text = ' '.join(text_parts)
             processed_text = self._clean_text(combined_text)
@@ -267,6 +254,9 @@ class CourseRecommender:
         """
         print("Generating embeddings...")
         
+        if self.processed_descriptions is None:
+            raise ValueError("Processed descriptions not available. Please preprocess data first.")
+        
         # Generate TF-IDF embeddings
         print("Generating TF-IDF embeddings...")
         self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(self.processed_descriptions)
@@ -278,9 +268,12 @@ class CourseRecommender:
             self.bert_embeddings = self.bert_model.encode(
                 self.processed_descriptions,
                 show_progress_bar=True,
-                batch_size=32
+                batch_size=32,
+                convert_to_numpy=True
             )
             print(f"BERT embeddings shape: {self.bert_embeddings.shape}")
+        else:
+            self.bert_embeddings = None
         
         print("Embeddings generated successfully")
     
@@ -305,12 +298,16 @@ class CourseRecommender:
             # Preprocess query
             processed_query = self._clean_text(query)
             
-            if method == 'bert' and self.bert_model is not None:
+            if method == 'bert':
+                if self.bert_model is None or self.bert_embeddings is None:
+                    raise ValueError("BERT model or embeddings not initialized")
                 # Use BERT embeddings
-                query_embedding = self.bert_model.encode([processed_query])
+                query_embedding = self.bert_model.encode([processed_query], convert_to_numpy=True)
                 similarities = cosine_similarity(query_embedding, self.bert_embeddings)[0]
                 
             elif method == 'tfidf':
+                if self.tfidf_vectorizer is None or self.tfidf_matrix is None:
+                    raise ValueError("TF-IDF vectorizer or matrix not initialized")
                 # Use TF-IDF embeddings
                 query_vector = self.tfidf_vectorizer.transform([processed_query])
                 similarities = cosine_similarity(query_vector, self.tfidf_matrix)[0]
@@ -323,13 +320,13 @@ class CourseRecommender:
             
             recommendations = []
             for idx in top_indices:
-                course_data = self.df.iloc[idx].copy()
+                course_data = self.df.iloc[idx]
                 recommendations.append({
-                    'course_name': course_data['Course Name'],
+                    'course_name': course_data.get('Course Name', 'Unknown'),
                     'university': course_data.get('University', 'Unknown'),
                     'difficulty': course_data.get('Difficulty Level', 'Unknown'),
-                    'rating': course_data.get('Course Rating', 0),
-                    'description': course_data['Course Description'],
+                    'rating': float(course_data.get('Course Rating', 0)),
+                    'description': course_data.get('Course Description', ''),
                     'skills': course_data.get('Skills', ''),
                     'url': course_data.get('Course URL', '#'),
                     'similarity_score': float(similarities[idx])
@@ -356,6 +353,10 @@ class CourseRecommender:
         Returns:
             List[Dict]: List of recommended courses.
         """
+        if self.df is None:
+            print("Dataframe not loaded. Please load data first.")
+            return []
+        
         skill_scores = np.zeros(len(self.df))
         
         for skill in target_skills:
@@ -363,8 +364,8 @@ class CourseRecommender:
             if skill_column in self.df.columns:
                 skill_scores += self.df[skill_column].values
             else:
-                # Fallback to text search
-                matches = self.df['Skills'].str.contains(skill, case=False, na=False)
+                # Fallback to text search in 'Skills' column
+                matches = self.df['Skills'].str.contains(re.escape(skill), case=False, na=False)
                 skill_scores += matches.astype(int).values
         
         # Get top courses
@@ -373,13 +374,13 @@ class CourseRecommender:
         recommendations = []
         for idx in top_indices:
             if skill_scores[idx] > 0:  # Only include courses with matching skills
-                course_data = self.df.iloc[idx].copy()
+                course_data = self.df.iloc[idx]
                 recommendations.append({
-                    'course_name': course_data['Course Name'],
+                    'course_name': course_data.get('Course Name', 'Unknown'),
                     'university': course_data.get('University', 'Unknown'),
                     'difficulty': course_data.get('Difficulty Level', 'Unknown'),
-                    'rating': course_data.get('Course Rating', 0),
-                    'description': course_data['Course Description'],
+                    'rating': float(course_data.get('Course Rating', 0)),
+                    'description': course_data.get('Course Description', ''),
                     'skills': course_data.get('Skills', ''),
                     'url': course_data.get('Course URL', '#'),
                     'skill_match_score': float(skill_scores[idx])
@@ -394,12 +395,16 @@ class CourseRecommender:
         Returns:
             Dict: Dictionary containing dataset statistics.
         """
+        if self.df is None:
+            print("Dataframe not loaded. Please load data first.")
+            return {}
+        
         stats = {
             'total_courses': len(self.df),
             'universities': self.df['University'].nunique() if 'University' in self.df.columns else 0,
             'difficulty_distribution': self.df['Difficulty Level'].value_counts().to_dict() if 'Difficulty Level' in self.df.columns else {},
             'avg_rating': float(self.df['Course Rating'].mean()) if 'Course Rating' in self.df.columns else 0,
-            'top_skills': self._get_top_skills(),
+            'top_skills': self._get_top_skills() if 'Skills' in self.df.columns else [],
             'top_universities': self.df['University'].value_counts().head(5).to_dict() if 'University' in self.df.columns else {}
         }
         return stats
@@ -430,7 +435,7 @@ def load_recommender(data_path: str = RAW_CSV_URL) -> CourseRecommender:
         data_path (str): Path to the course dataset.
         
     Returns:
-        CourseRecommender: Initialized recommender system.
+        CourseRecommender: Initialized recommender system or None if failed.
     """
     recommender = CourseRecommender(data_path)
     
