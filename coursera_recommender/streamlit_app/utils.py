@@ -17,6 +17,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 import warnings
+import streamlit as st
 warnings.filterwarnings('ignore')
 
 # Raw URL to the Coursera dataset CSV on GitHub (raw file link)
@@ -27,7 +28,7 @@ for resource in ['punkt', 'stopwords', 'wordnet']:
     try:
         nltk.data.find(f'tokenizers/{resource}' if resource == 'punkt' else f'corpora/{resource}')
     except LookupError:
-        nltk.download(resource)
+        nltk.download(resource, quiet=True)
 
 
 def safe_re_sub(pattern: str, repl: str, string: str) -> str:
@@ -223,7 +224,8 @@ class CourseRecommender:
         
         return ' '.join(tokens)
     
-    def initialize_models(self) -> None:
+    @st.cache_resource
+    def initialize_models(_self) -> None:
         """
         Initialize and configure the ML models (BERT, TF-IDF).
         """
@@ -232,14 +234,14 @@ class CourseRecommender:
         # Initialize BERT model
         try:
             print("Loading BERT model...")
-            self.bert_model = SentenceTransformer('all-MiniLM-L6-v2')
+            _self.bert_model = SentenceTransformer('all-MiniLM-L6-v2')
             print("BERT model loaded successfully")
         except Exception as e:
             print(f"Error loading BERT model: {str(e)}")
-            self.bert_model = None
+            _self.bert_model = None
         
         # Initialize TF-IDF vectorizer
-        self.tfidf_vectorizer = TfidfVectorizer(
+        _self.tfidf_vectorizer = TfidfVectorizer(
             max_features=5000,
             ngram_range=(1, 2),
             min_df=2,
@@ -248,32 +250,33 @@ class CourseRecommender:
         
         print("Models initialized successfully")
     
-    def generate_embeddings(self) -> None:
+    @st.cache_data
+    def generate_embeddings(_self) -> None:
         """
         Generate embeddings for all courses using BERT and TF-IDF.
         """
         print("Generating embeddings...")
         
-        if self.processed_descriptions is None:
+        if _self.processed_descriptions is None:
             raise ValueError("Processed descriptions not available. Please preprocess data first.")
         
         # Generate TF-IDF embeddings
         print("Generating TF-IDF embeddings...")
-        self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(self.processed_descriptions)
-        print(f"TF-IDF matrix shape: {self.tfidf_matrix.shape}")
+        _self.tfidf_matrix = _self.tfidf_vectorizer.fit_transform(_self.processed_descriptions)
+        print(f"TF-IDF matrix shape: {_self.tfidf_matrix.shape}")
         
         # Generate BERT embeddings
-        if self.bert_model is not None:
+        if _self.bert_model is not None:
             print("Generating BERT embeddings...")
-            self.bert_embeddings = self.bert_model.encode(
-                self.processed_descriptions,
+            _self.bert_embeddings = _self.bert_model.encode(
+                _self.processed_descriptions,
                 show_progress_bar=True,
                 batch_size=32,
                 convert_to_numpy=True
             )
-            print(f"BERT embeddings shape: {self.bert_embeddings.shape}")
+            print(f"BERT embeddings shape: {_self.bert_embeddings.shape}")
         else:
-            self.bert_embeddings = None
+            _self.bert_embeddings = None
         
         print("Embeddings generated successfully")
     
@@ -427,6 +430,7 @@ class CourseRecommender:
         return [skill for skill, count in skill_counts.most_common(10)]
 
 
+@st.cache_resource
 def load_recommender(data_path: str = RAW_CSV_URL) -> CourseRecommender:
     """
     Initialize and return a CourseRecommender instance.

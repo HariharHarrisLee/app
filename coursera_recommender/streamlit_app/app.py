@@ -151,7 +151,7 @@ def display_course_card(course: Dict[str, Any], show_similarity: bool = True):
             st.markdown(skill_html, unsafe_allow_html=True)
 
 
-        # Similarity score or enroll button
+        # Similarity score and view course button
         col1, col2, col3 = st.columns([2, 2, 1])
 
         with col1:
@@ -161,8 +161,16 @@ def display_course_card(course: Dict[str, Any], show_similarity: bool = True):
                 st.metric("🎯 Skill Match", f"{course['skill_match_score']:.0f}")
 
         with col2:
-            if st.button(f"📚 View Course", key=f"view_{course.get('course_name', '')[:20]}"):
-                st.markdown(f"[🔗 Open Course]({course.get('url', '#')})")
+            # FIXED: Use st.link_button for proper new tab opening
+            course_url = course.get('url', '#')
+            if course_url and course_url != '#':
+                st.link_button(
+                    "📚 View Course", 
+                    url=course_url,
+                    help="Open course in new tab"
+                )
+            else:
+                st.markdown("🚫 No course URL available")
 
         st.markdown("---")
 
@@ -300,6 +308,11 @@ def main():
         unsafe_allow_html=True
     )
 
+    # Initialize session state for maintaining app state
+    if 'recommendations' not in st.session_state:
+        st.session_state.recommendations = []
+    if 'last_query' not in st.session_state:
+        st.session_state.last_query = ""
 
     with st.spinner("🚀 Initializing AI models and loading course data..."):
         recommender = initialize_recommender()
@@ -339,7 +352,8 @@ def main():
             user_query = st.text_area(
                 "💭 What do you want to learn? (Describe your interests, goals, or skills)",
                 placeholder="e.g., machine learning, data science, web development, artificial intelligence...",
-                height=100
+                height=100,
+                value=st.session_state.last_query
             )
 
             col1, col2 = st.columns(2)
@@ -377,20 +391,25 @@ def main():
 
                         recommendations = [r for r in recommendations if r.get('rating', 0) >= min_rating]
 
-                        if recommendations:
-                            st.markdown(
-                                f'<h3 class="sub-header">🎯 Top {len(recommendations)} Recommendations for: "{user_query}"</h3>', 
-                                unsafe_allow_html=True
-                            )
-
-                            for i, course in enumerate(recommendations, 1):
-                                st.markdown(f"### {i}. 📚 Recommended Course")
-                                display_course_card(course, show_similarity=True)
-                        else:
-                            st.warning("🤔 No courses found matching your criteria. Try adjusting your filters or query.")
+                        # Store recommendations in session state
+                        st.session_state.recommendations = recommendations
+                        st.session_state.last_query = user_query
 
                 else:
                     st.warning("💭 Please enter a search query to get recommendations.")
+
+            # Display stored recommendations
+            if st.session_state.recommendations:
+                st.markdown(
+                    f'<h3 class="sub-header">🎯 Top {len(st.session_state.recommendations)} Recommendations for: "{st.session_state.last_query}"</h3>', 
+                    unsafe_allow_html=True
+                )
+
+                for i, course in enumerate(st.session_state.recommendations, 1):
+                    st.markdown(f"### {i}. 📚 Recommended Course")
+                    display_course_card(course, show_similarity=True)
+            elif st.session_state.last_query:
+                st.warning("🤔 No courses found matching your criteria. Try adjusting your filters or query.")
 
 
         elif "Skill-based" in recommendation_method:
@@ -424,20 +443,25 @@ def main():
                             top_n=num_recommendations
                         )
 
-                        if recommendations:
-                            st.markdown(
-                                f'<h3 class="sub-header">🎯 Courses for Skills: {", ".join(selected_skills)}</h3>', 
-                                unsafe_allow_html=True
-                            )
-
-                            for i, course in enumerate(recommendations, 1):
-                                st.markdown(f"### {i}. 📚 Skill-Matched Course")
-                                display_course_card(course, show_similarity=False)
-                        else:
-                            st.warning("🤔 No courses found for the selected skills.")
+                        # Store skill-based recommendations in session state
+                        st.session_state.recommendations = recommendations
+                        st.session_state.last_query = f"Skills: {', '.join(selected_skills)}"
 
                 else:
                     st.warning("🎯 Please select at least one skill.")
+
+            # Display skill-based recommendations
+            if st.session_state.recommendations and "Skills:" in st.session_state.last_query:
+                st.markdown(
+                    f'<h3 class="sub-header">🎯 Courses for {st.session_state.last_query}</h3>', 
+                    unsafe_allow_html=True
+                )
+
+                for i, course in enumerate(st.session_state.recommendations, 1):
+                    st.markdown(f"### {i}. 📚 Skill-Matched Course")
+                    display_course_card(course, show_similarity=False)
+            elif "Skills:" in st.session_state.last_query:
+                st.warning("🤔 No courses found for the selected skills.")
 
 
     with tab2:
@@ -488,6 +512,7 @@ def main():
             - ✅ **Real-time Analytics**: Live dashboard with course statistics
             - ✅ **Semantic Search**: Understand context and intent, not just keywords
             - ✅ **Skill Visualization**: Word clouds and interactive charts
+            - ✅ **Working Course Links**: Direct access to Coursera course pages
             
             ### 🚀 Future Enhancements
             - Neural Collaborative Filtering for user-based recommendations
