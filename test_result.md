@@ -101,3 +101,86 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Fix critical bug in Streamlit course recommender app where 'View Course' buttons don't work properly. The buttons either do nothing or reset the app instead of opening course URLs in new tabs. Need to display multiple course recommendations with working buttons that open Coursera links in new browser tabs."
+
+backend:
+  - task: "Update requirements.txt to specified versions"
+    implemented: true
+    working: true
+    file: "/app/coursera_recommender/requirements.txt"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Successfully updated requirements.txt to exact versions specified by user: streamlit==1.29.0, sentence-transformers==2.2.2, etc. All dependencies installed successfully."
+
+frontend:
+  - task: "Fix View Course button bug - buttons not opening URLs in new tabs"
+    implemented: true
+    working: true
+    file: "/app/coursera_recommender/streamlit_app/app.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "CRITICAL BUG FIXED: Replaced faulty button implementation with st.link_button() that properly opens course URLs in new tabs. Old code used st.button + st.markdown which only displayed links below buttons."
+
+  - task: "Fix app state management - prevent reset when buttons clicked"
+    implemented: true
+    working: true
+    file: "/app/coursera_recommender/streamlit_app/app.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "FIXED: Added st.session_state to maintain recommendations and query state across button clicks. App now preserves displayed recommendations when View Course buttons are clicked."
+
+  - task: "Display multiple course recommendations simultaneously"
+    implemented: true
+    working: true
+    file: "/app/coursera_recommender/streamlit_app/app.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "WORKING: App displays 3-10 course cards simultaneously (configurable via slider). Each course has its own working View Course button."
+
+  - task: "Add caching for better performance"
+    implemented: true
+    working: true
+    file: "/app/coursera_recommender/streamlit_app/utils.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added @st.cache_resource and @st.cache_data decorators to model initialization and embedding generation functions for improved performance."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Fix View Course button bug - buttons not opening URLs in new tabs"
+    - "Fix app state management - prevent reset when buttons clicked"
+    - "Display multiple course recommendations simultaneously"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Fixed critical View Course button bug by replacing st.button+st.markdown with st.link_button(). Added session state management to prevent app resets. App now displays multiple course recommendations with working buttons that open URLs in new tabs. Ready for testing."
